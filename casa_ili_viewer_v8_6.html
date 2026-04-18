@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casa Ili Chen Sun — Interactive Viewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --ink: #1a1a18;
+    --paper: #f4f1eb;
+    --amber: #c4820a;
+    --amber-light: #e8a830;
+    --steel: #2a2d35;
+    --glass: rgba(244,241,235,0.06);
+    --panel-bg: rgba(20,20,18,0.92);
+    --border: rgba(196,130,10,0.25);
+    --text-muted: rgba(244,241,235,0.45);
+    --text-secondary: rgba(244,241,235,0.7);
+    --text-primary: rgba(244,241,235,0.95);
+  }
+
+  body {
+    background: #0e0e0c;
+    font-family: 'DM Mono', monospace;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  #canvas-container {
+    position: absolute;
+    inset: 0;
+  }
+
+  canvas { display: block; }
+
+  /* Header */
+  #header {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 20px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    pointer-events: none;
+    z-index: 10;
+    background: linear-gradient(to bottom, rgba(14,14,12,0.8) 0%, transparent 100%);
+  }
+
+  #project-info { pointer-events: none; }
+
+  #project-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--text-primary);
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+
+  #project-sub {
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  #project-meta {
+    text-align: right;
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+    line-height: 1.8;
+  }
+
+  /* Camera buttons */
+  #cameras {
+    position: absolute;
+    left: 20px;
+    bottom: 90px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cam-btn {
+    background: var(--panel-bg);
+    border: 0.5px solid var(--border);
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .cam-btn:hover, .cam-btn.active {
+    border-color: var(--amber);
+    color: var(--amber-light);
+    background: rgba(196,130,10,0.12);
+  }
+
+  /* Tweaks panel */
+  #panel {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 260px;
+    background: var(--panel-bg);
+    border-left: 0.5px solid var(--border);
+    z-index: 10;
+    overflow-y: auto;
+    padding: 70px 0 20px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  #panel::-webkit-scrollbar { width: 2px; }
+  #panel::-webkit-scrollbar-track { background: transparent; }
+  #panel::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .panel-section {
+    padding: 16px 20px;
+    border-bottom: 0.5px solid rgba(196,130,10,0.12);
+  }
+
+  .section-label {
+    font-size: 8px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 14px;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 10px;
+  }
+
+  .control-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    flex: 0 0 auto;
+    min-width: 80px;
+  }
+
+  .control-value {
+    font-size: 10px;
+    color: var(--amber-light);
+    letter-spacing: 0.05em;
+    min-width: 36px;
+    text-align: right;
+    flex: 0 0 auto;
+  }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 2px;
+    background: rgba(196,130,10,0.2);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--amber);
+    cursor: pointer;
+  }
+
+  /* Swatch buttons */
+  .swatch-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .swatch {
+    width: 28px;
+    height: 28px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .swatch.active {
+    border-color: var(--amber-light);
+    transform: scale(1.1);
+  }
+
+  .swatch-label {
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  .swatch-group { display: flex; flex-direction: column; align-items: center; }
+
+  /* Weather buttons */
+  .weather-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-top: 4px;
+  }
+
+  .weather-btn {
+    background: rgba(244,241,235,0.04);
+    border: 0.5px solid rgba(196,130,10,0.2);
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 6px 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .weather-btn.active, .weather-btn:hover {
+    border-color: var(--amber);
+    color: var(--amber-light);
+    background: rgba(196,130,10,0.1);
+  }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .toggle {
+    width: 32px;
+    height: 16px;
+    background: rgba(196,130,10,0.15);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.on { background: rgba(196,130,10,0.4); }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: all 0.2s;
+  }
+
+  .toggle.on .toggle-thumb {
+    left: 18px;
+    background: var(--amber-light);
+  }
+
+  /* Footer */
+  #footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 260px;
+    padding: 14px 20px;
+    background: linear-gradient(to top, rgba(14,14,12,0.85) 0%, transparent 100%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .hint {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .hint span { color: var(--amber); }
+
+  /* Loading */
+  #loading {
+    position: absolute;
+    inset: 0;
+    background: #0e0e0c;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  #loading-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--text-primary);
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  #loading-sub {
+    font-size: 9px;
+    color: var(--amber);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  #loading-bar-track {
+    width: 200px;
+    height: 1px;
+    background: rgba(196,130,10,0.2);
+    position: relative;
+    margin-bottom: 16px;
+  }
+
+  #loading-bar {
+    position: absolute;
+    left: 0; top: 0; height: 1px;
+    background: var(--amber);
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  #loading-status {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+  }
+
+  /* Error */
+  #error-msg {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: #0e0e0c;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 200;
+  }
+
+  #error-msg p {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    color: var(--text-secondary);
+    text-align: center;
+    max-width: 400px;
+    line-height: 1.6;
+  }
+
+  #error-msg small {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div id="loading-title">Casa Ili Chen Sun</div>
+  <div id="loading-sub">Esterillos Oeste · Costa Rica</div>
+  <div id="loading-bar-track"><div id="loading-bar"></div></div>
+  <div id="loading-status">Initialising scene…</div>
+</div>
+
+<div id="error-msg">
+  <p>Unable to load the model.<br>Check CORS settings on your GitHub repo.</p>
+  <small id="error-detail"></small>
+</div>
+
+<div id="canvas-container"></div>
+
+<div id="header">
+  <div id="project-info">
+    <div id="project-name">Casa de Habitación<br>Ili Chen Sun</div>
+    <div id="project-sub">Tropical Brutalist Modern — Warm Edition</div>
+  </div>
+  <div id="project-meta">
+    Architect — Henry Hoffman Schultz CFIA A-8784<br>
+    Structure — Jose Luis Barzuna Peinador IC-30470<br>
+    Esterillos Oeste · Parrita · Puntarenas · Costa Rica
+  </div>
+</div>
+
+<div id="cameras">
+  <button class="cam-btn active" onclick="setCamera('overview')">Overview</button>
+  <button class="cam-btn" onclick="setCamera('west')">West facade</button>
+  <button class="cam-btn" onclick="setCamera('pool')">Pool deck</button>
+  <button class="cam-btn" onclick="setCamera('street')">Street entry</button>
+  <button class="cam-btn" onclick="setCamera('aerial')">Aerial</button>
+  <button class="cam-btn" id="btn-drone" onclick="toggleDrone()" style="border-color:rgba(196,130,10,0.5);margin-top:6px;">⟳ Drone 360°</button>
+</div>
+
+<div id="panel">
+  <div class="panel-section">
+    <div class="section-label">Environment</div>
+    <div class="control-row">
+      <div class="control-label">Time of day</div>
+      <input type="range" id="tod" min="0" max="24" step="0.1" value="14">
+      <div class="control-value" id="tod-val">14:00</div>
+    </div>
+    <div class="control-row">
+      <div class="control-label">Sun intensity</div>
+      <input type="range" id="sun" min="0" max="100" step="1" value="75">
+      <div class="control-value" id="sun-val">75%</div>
+    </div>
+    <div class="control-row">
+      <div class="control-label">Ambient</div>
+      <input type="range" id="amb" min="10" max="100" step="1" value="40">
+      <div class="control-value" id="amb-val">40%</div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-label">Weather</div>
+    <div class="weather-row">
+      <button class="weather-btn active" onclick="setWeather('clear',this)">Clear</button>
+      <button class="weather-btn" onclick="setWeather('haze',this)">Haze</button>
+      <button class="weather-btn" onclick="setWeather('overcast',this)">Overcast</button>
+      <button class="weather-btn" onclick="setWeather('storm',this)">Storm</button>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-label">Cladding</div>
+    <div class="swatch-row">
+      <div class="swatch-group">
+        <div class="swatch active" style="background:#8a8580;" onclick="setCladding('concrete',this)" title="Raw concrete"></div>
+        <div class="swatch-label">Concrete</div>
+      </div>
+      <div class="swatch-group">
+        <div class="swatch" style="background:#e8e4dc;" onclick="setCladding('white',this)" title="White render"></div>
+        <div class="swatch-label">White</div>
+      </div>
+      <div class="swatch-group">
+        <div class="swatch" style="background:#c4920a;" onclick="setCladding('teak',this)" title="Warm teak panels"></div>
+        <div class="swatch-label">Teak</div>
+      </div>
+      <div class="swatch-group">
+        <div class="swatch" style="background:#3a3a38;" onclick="setCladding('charcoal',this)" title="Charcoal render"></div>
+        <div class="swatch-label">Charcoal</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-label">Glass Facade</div>
+    <div class="control-row">
+      <div class="control-label">Tint</div>
+      <input type="range" id="glass-tint" min="0" max="100" step="1" value="45">
+      <div class="control-value" id="tint-val">45%</div>
+    </div>
+    <div class="control-row">
+      <div class="control-label">Opacity</div>
+      <input type="range" id="glass-opacity" min="15" max="90" step="1" value="50">
+      <div class="control-value" id="opacity-val">50%</div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-label">Pool</div>
+    <div class="control-row">
+      <div class="control-label">Water color</div>
+      <input type="range" id="pool-hue" min="0" max="100" step="1" value="50">
+      <div class="control-value" id="pool-val">Caribbean</div>
+    </div>
+    <div class="toggle-row">
+      <div class="control-label">Glow effect</div>
+      <div class="toggle on" id="pool-glow" onclick="toggleFeature('pool-glow',this)">
+        <div class="toggle-thumb"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-label">Landscape</div>
+    <div class="control-row">
+      <div class="control-label">Tree density</div>
+      <input type="range" id="trees" min="0" max="100" step="1" value="60">
+      <div class="control-value" id="trees-val">60%</div>
+    </div>
+    <div class="control-row">
+      <div class="control-label">Grass tone</div>
+      <input type="range" id="grass" min="0" max="100" step="1" value="50">
+      <div class="control-value" id="grass-val">Tropical</div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-label">Scene</div>
+    <div class="toggle-row">
+      <div class="control-label">Wireframe</div>
+      <div class="toggle" id="toggle-wire" onclick="toggleFeature('toggle-wire',this)">
+        <div class="toggle-thumb"></div>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <div class="control-label">Shadows</div>
+      <div class="toggle on" id="toggle-shadow" onclick="toggleFeature('toggle-shadow',this)">
+        <div class="toggle-thumb"></div>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <div class="control-label">Auto-rotate</div>
+      <div class="toggle" id="toggle-rotate" onclick="toggleFeature('toggle-rotate',this)">
+        <div class="toggle-thumb"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="footer">
+  <div class="hint"><span>Drag</span> to orbit</div>
+  <div class="hint"><span>Scroll</span> to zoom</div>
+  <div class="hint"><span>Right-drag</span> to pan</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const GLB_URL = 'https://cdn.jsdelivr.net/gh/StephaneArchitect/casa-ili-model@main/casa_ili.glb';
+
+let scene, camera, renderer, controls, sun, ambientLight, hemiLight;
+let model = null;
+let trees = [];
+let autoRotate = false;
+let shadowsOn = true;
+let poolGlow = true;
+let weather = 'clear';
+let cladding = 'concrete';
+let originalMaterials = new Map();
+
+const setProgress = (pct, msg) => {
+  document.getElementById('loading-bar').style.width = pct + '%';
+  document.getElementById('loading-status').textContent = msg;
+};
+
+function initScene() {
+  setProgress(10, 'Setting up renderer…');
+  const container = document.getElementById('canvas-container');
+  const W = window.innerWidth, H = window.innerHeight;
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  container.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87a8c5);
+  scene.fog = new THREE.FogExp2(0xa8c4d8, 0.008);
+
+  camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 2000);
+  camera.position.set(10, 15, 20);
+  camera.lookAt(0, 10, 0);
+
+  // Lights
+  ambientLight = new THREE.AmbientLight(0xfff5e0, 0.4);
+  scene.add(ambientLight);
+
+  hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x4a6741, 0.3);
+  scene.add(hemiLight);
+
+  sun = new THREE.DirectionalLight(0xfff5d0, 1.2);
+  sun.position.set(30, 50, 20);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 300;
+  sun.shadow.camera.left = -80;
+  sun.shadow.camera.right = 80;
+  sun.shadow.camera.top = 80;
+  sun.shadow.camera.bottom = -80;
+  sun.shadow.bias = -0.001;
+  scene.add(sun);
+
+  setProgress(20, 'Loading model…');
+}
+
+// === EXACT SCENE COORDINATES (calculated from Blender export) ===
+// House center: (11.93, 10.23, 2.36) — scale 0.2543
+// House diagonal: ~7 units, good cam distance: 8-12 units
+const HOUSE = { cx: 11.93, cy: 10.23, cz: 2.36, top: 20.47, diag: 6.93 };
+
+// These get overwritten at runtime after GLB loads
+let CAM = {
+  tx: 0, ty: 0, tz: 0,   // look-at target = house center
+  roofY: 0,               // house roof Y
+  dist: 12,               // orbit distance
+  droneR: 16,             // drone orbit radius
+  droneY: 0,              // drone height
+};
+
+let isDragging = false, isRightDragging = false;
+let lastX, lastY;
+let spherical = { theta: -1.2, phi: 1.1 };
+let zoom = 12;
+let target = new THREE.Vector3(0, 0, 0);
+let droneMode = false;
+let droneAngle = 0;
+
+function initOrbitControls() {
+  const el = renderer.domElement;
+
+  el.addEventListener('mousedown', e => {
+    if (e.button === 0) isDragging = true;
+    if (e.button === 2) isRightDragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    e.preventDefault();
+  });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+
+  window.addEventListener('mousemove', e => {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (isDragging && !droneMode) {
+      spherical.theta -= dx * 0.008;
+      spherical.phi = Math.max(0.05, Math.min(Math.PI * 0.48, spherical.phi + dy * 0.008));
+    }
+    if (isRightDragging && !droneMode) {
+      const right = new THREE.Vector3().crossVectors(
+        new THREE.Vector3(0,1,0),
+        new THREE.Vector3().subVectors(camera.position, target)
+      ).normalize();
+      target.addScaledVector(right, -dx * 0.015);
+      target.y -= dy * 0.015;
+    }
+  });
+  window.addEventListener('mouseup', () => { isDragging = false; isRightDragging = false; });
+  el.addEventListener('wheel', e => {
+    if (!droneMode) zoom = Math.max(2, Math.min(80, zoom + e.deltaY * 0.02));
+    e.preventDefault();
+  }, { passive: false });
+
+  controls = {
+    update() {
+      if (droneMode) {
+        droneAngle += 0.005;
+        camera.position.set(
+          CAM.tx + Math.sin(droneAngle) * CAM.droneR,
+          CAM.droneY,
+          CAM.tz + Math.cos(droneAngle) * CAM.droneR
+        );
+        // Always look at roof center
+        camera.lookAt(CAM.tx, CAM.roofY, CAM.tz);
+      } else {
+        if (autoRotate) spherical.theta += 0.003;
+        const sinPhi = Math.sin(spherical.phi);
+        camera.position.set(
+          target.x + zoom * sinPhi * Math.sin(spherical.theta),
+          target.y + zoom * Math.cos(spherical.phi),
+          target.z + zoom * sinPhi * Math.cos(spherical.theta)
+        );
+        camera.lookAt(target);
+      }
+    },
+    setTarget(x, y, z) { target.set(x, y, z); },
+    setSpherical(t, p, r) { spherical.theta = t; spherical.phi = p; zoom = r; }
+  };
+}
+
+function loadGLTF() {
+  const manager = new THREE.LoadingManager();
+
+  manager.onProgress = (url, loaded, total) => {
+    const pct = 20 + (loaded / total) * 60;
+    setProgress(pct, `Loading geometry… ${Math.round(loaded/total*100)}%`);
+  };
+
+  setProgress(25, 'Fetching GLB…');
+
+  fetch(GLB_URL)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setProgress(40, 'Parsing geometry…');
+      return r.arrayBuffer();
+    })
+    .then(buffer => {
+      setProgress(60, 'Building materials…');
+
+      const { GLTFLoader } = (() => {
+        class GLTFLoader {
+          constructor(manager) { this.manager = manager; }
+          parse(buffer, path, onLoad, onError) {
+            try {
+              const view = new DataView(buffer);
+              const magic = view.getUint32(0, true);
+              if (magic !== 0x46546C67) throw new Error('Not a GLB');
+              const version = view.getUint32(4, true);
+              const jsonLength = view.getUint32(12, true);
+              const jsonBytes = new Uint8Array(buffer, 20, jsonLength);
+              const json = JSON.parse(new TextDecoder().decode(jsonBytes));
+              const binStart = 20 + jsonLength + 8;
+              const binBuffer = buffer.slice(binStart);
+              this._build(json, binBuffer, onLoad, onError);
+            } catch(e) { onError(e); }
+          }
+
+          _build(json, binBuffer, onLoad, onError) {
+            try {
+              const root = new THREE.Group();
+              const buffers = [binBuffer];
+              const bufferViews = json.bufferViews || [];
+              const accessors = json.accessors || [];
+              const materials = (json.materials || []).map(m => this._makeMaterial(m));
+
+              const getAccessor = (idx) => {
+                const acc = accessors[idx];
+                const bv = bufferViews[acc.bufferView];
+                const offset = (bv.byteOffset||0) + (acc.byteOffset||0);
+                const count = acc.count;
+                const TypeMap = {5120:Int8Array,5121:Uint8Array,5122:Int16Array,5123:Uint16Array,5125:Uint32Array,5126:Float32Array};
+                const Ctor = TypeMap[acc.componentType];
+                const compMap = {SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT2:4,MAT3:9,MAT4:16};
+                const comps = compMap[acc.type];
+                return new Ctor(buffers[0], offset, count * comps);
+              };
+
+              const hasDraco = json.extensionsUsed && json.extensionsUsed.includes('KHR_draco_mesh_compression');
+
+              if (hasDraco) {
+                onError(new Error('DRACO_NEEDED'));
+                return;
+              }
+
+              const buildMesh = (meshDef) => {
+                const group = new THREE.Group();
+                for (const prim of meshDef.primitives) {
+                  const geom = new THREE.BufferGeometry();
+                  if (prim.attributes.POSITION !== undefined) {
+                    geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(getAccessor(prim.attributes.POSITION)), 3));
+                  }
+                  if (prim.attributes.NORMAL !== undefined) {
+                    geom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(getAccessor(prim.attributes.NORMAL)), 3));
+                  }
+                  if (prim.indices !== undefined) {
+                    const idx = getAccessor(prim.indices);
+                    geom.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+                  }
+                  if (!prim.attributes.NORMAL) geom.computeVertexNormals();
+                  const mat = prim.material !== undefined ? materials[prim.material] : new THREE.MeshStandardMaterial();
+                  const mesh = new THREE.Mesh(geom, mat);
+                  mesh.castShadow = true;
+                  mesh.receiveShadow = true;
+                  group.add(mesh);
+                }
+                return group;
+              };
+
+              for (const node of (json.nodes || [])) {
+                if (node.mesh !== undefined) {
+                  const meshGroup = buildMesh(json.meshes[node.mesh]);
+                  if (node.translation) meshGroup.position.fromArray(node.translation);
+                  if (node.rotation) meshGroup.quaternion.fromArray(node.rotation);
+                  if (node.scale) meshGroup.scale.fromArray(node.scale);
+                  root.add(meshGroup);
+                }
+              }
+
+              onLoad({ scene: root });
+            } catch(e) { onError(e); }
+          }
+
+          _makeMaterial(m) {
+            const mat = new THREE.MeshStandardMaterial();
+            if (m.pbrMetallicRoughness) {
+              const pbr = m.pbrMetallicRoughness;
+              if (pbr.baseColorFactor) {
+                mat.color.setRGB(pbr.baseColorFactor[0], pbr.baseColorFactor[1], pbr.baseColorFactor[2]);
+                if (pbr.baseColorFactor[3] < 1) { mat.transparent = true; mat.opacity = pbr.baseColorFactor[3]; }
+              }
+              if (pbr.metallicFactor !== undefined) mat.metalness = pbr.metallicFactor;
+              if (pbr.roughnessFactor !== undefined) mat.roughness = pbr.roughnessFactor;
+            }
+            if (m.alphaMode === 'BLEND') { mat.transparent = true; }
+            if (m.doubleSided) mat.side = THREE.DoubleSide;
+            mat.name = m.name || '';
+            return mat;
+          }
+        }
+        return { GLTFLoader };
+      })();
+
+      const loader = new GLTFLoader(manager);
+      loader.parse(buffer, '', gltf => {
+        setProgress(85, 'Building scene…');
+        onModelLoaded(gltf.scene);
+      }, err => {
+        if (err.message === 'DRACO_NEEDED') {
+          loadWithDraco(buffer);
+        } else {
+          showError('Parse error: ' + err.message);
+        }
+      });
+    })
+    .catch(err => {
+      showError(err.message);
+    });
+}
+
+function loadWithDraco(buffer) {
+  setProgress(65, 'Loading Draco decoder…');
+
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+  script.onload = () => {
+    const script2 = document.createElement('script');
+    script2.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js';
+    script2.onload = () => {
+      setProgress(75, 'Decoding compressed mesh…');
+      try {
+        const dracoLoader = new THREE.DRACOLoader();
+        dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+
+        const loader = new THREE.GLTFLoader();
+        loader.setDRACOLoader(dracoLoader);
+
+        const blob = new Blob([buffer]);
+        const url = URL.createObjectURL(blob);
+
+        loader.load(url, gltf => {
+          URL.revokeObjectURL(url);
+          setProgress(90, 'Finalising…');
+          onModelLoaded(gltf.scene);
+        }, xhr => {
+          setProgress(75 + (xhr.loaded/xhr.total)*15, 'Decoding…');
+        }, err => {
+          showError('DRACO decode failed: ' + err.message);
+        });
+      } catch(e) {
+        showError('Loader error: ' + e.message);
+      }
+    };
+    script2.onerror = () => showError('Could not load DRACOLoader');
+    document.head.appendChild(script2);
+  };
+  script.onerror = () => showError('Could not load GLTFLoader');
+  document.head.appendChild(script);
+}
+
+function onModelLoaded(gltfScene) {
+  setProgress(92, 'Positioning model…');
+
+  // Measure raw GLB bbox
+  const raw = new THREE.Box3().setFromObject(gltfScene);
+  const rawC = raw.getCenter(new THREE.Vector3());
+  const rawS = raw.getSize(new THREE.Vector3());
+
+  // Center XZ, sit bottom at Y=0
+  gltfScene.position.set(-rawC.x, -raw.min.y, -rawC.z);
+
+  // Scale: longest XZ = 30 units
+  const sc = 30 / Math.max(rawS.x, rawS.z);
+  gltfScene.scale.setScalar(sc);
+
+  // Add to scene FIRST, then measure in world space
+  gltfScene.traverse(child => {
+    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; originalMaterials.set(child.uuid, child.material.clone()); }
+  });
+  model = gltfScene;
+  scene.add(model);
+
+  // NOW measure real world coords
+  const wb = new THREE.Box3().setFromObject(model);
+  const ws = wb.getSize(new THREE.Vector3());
+
+  // House occupies the high-X, high-Z corner of the terrain
+  // Approximate house center: X = 75% of terrain width, Z = 65% from Z min
+  const houseCX = wb.min.x + ws.x * 0.75;
+  const houseCZ = wb.min.z + ws.z * 0.65;
+  const houseMidY = wb.min.y + ws.y * 0.75;  // house is in top 40% of Y range
+  const houseTopY = wb.max.y;
+
+  // House footprint is ~20% of terrain footprint
+  const hDiag = Math.sqrt(ws.x * ws.x + ws.z * ws.z) * 0.22;
+
+  // Populate CAM with HOUSE center, not terrain center
+  CAM.tx = houseCX;
+  CAM.ty = houseMidY;
+  CAM.tz = houseCZ;
+  CAM.roofY = houseTopY;
+  CAM.dist = Math.max(hDiag * 1.2, 6);
+  CAM.droneR = Math.max(hDiag * 1.5, 6);
+  CAM.droneY = houseTopY + Math.max(hDiag * 0.3, 2);
+
+  console.log('World box:', wb.min, wb.max, 'size:', ws);
+  console.log('House center CAM:', JSON.stringify(CAM));
+
+  setProgress(95, 'Adding vegetation…');
+  addTreesOnTerrain(wb);
+
+  setProgress(100, 'Ready');
+  setTimeout(() => {
+    document.getElementById('loading').style.display = 'none';
+    // Place camera directly in front of house at house mid-height
+    // phi ~1.1 = slightly above horizon, theta chosen to face house from south
+    controls.setTarget(CAM.tx, CAM.ty, CAM.tz);
+    controls.setSpherical(-1.1, 1.15, CAM.dist);
+    // Start directly in drone mode
+    droneMode = true;
+    droneAngle = 0;
+    document.querySelector('.cam-btn.active').classList.remove('active');
+    document.getElementById('btn-drone').classList.add('active');
+    animate();
+  }, 400);
+}
+
+function addTreesOnTerrain(scaledBox) {
+  // Place trees on the actual terrain surface using raycasting
+  const raycaster = new THREE.Raycaster();
+  const downDir = new THREE.Vector3(0, -1, 0);
+
+  // Get terrain meshes to raycast against
+  const terrainMeshes = [];
+  if (model) {
+    model.traverse(child => {
+      if (child.isMesh) terrainMeshes.push(child);
+    });
+  }
+
+  const bx = scaledBox;
+  const cx = (bx.min.x + bx.max.x) / 2;
+  const cz = (bx.min.z + bx.max.z) / 2;
+  const rx = (bx.max.x - bx.min.x) * 0.45;
+  const rz = (bx.max.z - bx.min.z) * 0.45;
+
+  // Scatter tree candidates around the terrain perimeter + edges
+  const candidates = [];
+  for (let i = 0; i < 60; i++) {
+    const angle = (i / 60) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+    const dist = 0.55 + Math.random() * 0.45;
+    candidates.push([
+      cx + Math.cos(angle) * rx * dist,
+      cz + Math.sin(angle) * rz * dist
+    ]);
+  }
+  // Add some inside the terrain too (hillside)
+  for (let i = 0; i < 20; i++) {
+    candidates.push([
+      cx + (Math.random() - 0.5) * rx * 1.2,
+      cz + (Math.random() - 0.5) * rz * 1.2
+    ]);
+  }
+
+  let placed = 0;
+  candidates.forEach(([x, z]) => {
+    // Raycast from high above down onto terrain
+    raycaster.set(new THREE.Vector3(x, bx.max.y + 5, z), downDir);
+    const hits = raycaster.intersectObjects(terrainMeshes, false);
+
+    let groundY = 0;
+    if (hits.length > 0) {
+      groundY = hits[0].point.y;
+    } else {
+      return; // skip if no terrain hit
+    }
+
+    // Don't place on house structure (too high above terrain base)
+    if (groundY > bx.min.y + (bx.max.y - bx.min.y) * 0.35) return;
+
+    const h = (1.5 + Math.random() * 3);
+    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.10, h, 5);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3d1a, roughness: 0.9 });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.set(x, groundY + h / 2, z);
+    trunk.castShadow = true;
+
+    // Tropical palm-ish crown
+    const crownH = 1.0 + Math.random() * 1.2;
+    const crownR = 0.8 + Math.random() * 0.9;
+    const crownGeo = new THREE.SphereGeometry(crownR, 6, 5);
+    crownGeo.scale(1, 0.6, 1); // flatten slightly
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0x2a5a18, roughness: 0.95 });
+    const crown = new THREE.Mesh(crownGeo, crownMat);
+    crown.position.set(x, groundY + h + crownH * 0.3, z);
+    crown.castShadow = true;
+
+    scene.add(trunk);
+    scene.add(crown);
+    trees.push({ trunk, crown });
+    placed++;
+  });
+
+  console.log(`Placed ${placed} trees on terrain surface`);
+}
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  const el = document.getElementById('error-msg');
+  el.style.display = 'flex';
+  document.getElementById('error-detail').textContent = msg;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  const W = window.innerWidth, H = window.innerHeight;
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+});
+
+// ─── Controls ───────────────────────────────────────────
+
+const cameras = {
+  overview: { theta: -1.1, phi: 1.15, rMult: 1.0,  ox:0, oz:0 },
+  west:     { theta: -0.1, phi: 1.0,  rMult: 0.95, ox:0, oz:0 },
+  pool:     { theta:  3.57, phi: 1.25, rMult: 2.0,  ox:-9.1, oz: 4.15 },
+  street:   { theta:  2.0, phi: 1.25, rMult: 0.8,  ox:0, oz:0 },
+  aerial:   { theta: -0.8, phi: 0.3,  rMult: 2.5,  ox:0, oz:0 },
+};
+
+window.setCamera = (name) => {
+  droneMode = false;
+  document.getElementById('btn-drone').classList.remove('active');
+  const c = cameras[name];
+  if (!c) return;
+  controls.setTarget(CAM.tx + (c.ox||0), CAM.ty, CAM.tz + (c.oz||0));
+  controls.setSpherical(c.theta, c.phi, CAM.dist * c.rMult);
+  document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+};
+
+window.toggleDrone = () => {
+  droneMode = !droneMode;
+  document.getElementById('btn-drone').classList.toggle('active', droneMode);
+  document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+  if (droneMode) {
+    droneAngle = 0;
+    document.getElementById('btn-drone').classList.add('active');
+  }
+};
+
+window.setWeather = (w, btn) => {
+  weather = w;
+  document.querySelectorAll('.weather-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const configs = {
+    clear:    { fog: 0x87ceeb, fogD: 0.006, sky: 0x87a8c5, sun: 1.2, amb: 0.4 },
+    haze:     { fog: 0xc8d4b8, fogD: 0.018, sky: 0xb8c4a8, sun: 0.7, amb: 0.5 },
+    overcast: { fog: 0x9aabb5, fogD: 0.025, sky: 0x7a8a90, sun: 0.2, amb: 0.7 },
+    storm:    { fog: 0x4a5055, fogD: 0.04,  sky: 0x3a4045, sun: 0.05, amb: 0.35 },
+  };
+  const cfg = configs[w];
+  scene.fog.color.set(cfg.fog);
+  scene.fog.density = cfg.fogD;
+  scene.background.set(cfg.sky);
+  sun.intensity = cfg.sun * (document.getElementById('sun').value / 75);
+  ambientLight.intensity = cfg.amb * (document.getElementById('amb').value / 40);
+};
+
+const claddingColors = {
+  concrete: 0x8a8580,
+  white:    0xe8e4dc,
+  teak:     0xb87a20,
+  charcoal: 0x3a3a38,
+};
+
+window.setCladding = (type, el) => {
+  cladding = type;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+
+  if (!model) return;
+  const color = new THREE.Color(claddingColors[type]);
+  model.traverse(child => {
+    if (child.isMesh) {
+      const orig = originalMaterials.get(child.uuid);
+      if (!orig) return;
+      const r = orig.color.r, g = orig.color.g, b = orig.color.b;
+      const isWall = r > 0.3 && r < 0.7 && Math.abs(r-g) < 0.15 && Math.abs(g-b) < 0.15;
+      if (isWall) child.material.color.copy(color);
+    }
+  });
+};
+
+window.toggleFeature = (id, el) => {
+  el.classList.toggle('on');
+  const on = el.classList.contains('on');
+
+  if (id === 'toggle-wire' && model) {
+    model.traverse(c => { if (c.isMesh) c.material.wireframe = on; });
+  }
+  if (id === 'toggle-shadow') {
+    shadowsOn = on;
+    renderer.shadowMap.enabled = on;
+    sun.castShadow = on;
+  }
+  if (id === 'toggle-rotate') {
+    autoRotate = on;
+    if (on) { droneMode = false; document.getElementById('btn-drone').classList.remove('active'); }
+  }
+  if (id === 'pool-glow') { poolGlow = on; }
+};
+
+// Sliders
+document.getElementById('tod').addEventListener('input', e => {
+  const h = parseFloat(e.target.value);
+  const hrs = Math.floor(h), mins = Math.round((h - hrs) * 60);
+  document.getElementById('tod-val').textContent = `${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
+  const t = h / 24;
+  const sunAngle = (t - 0.25) * Math.PI * 2;
+  sun.position.set(Math.cos(sunAngle) * 60, Math.sin(sunAngle) * 60, 20);
+  const isNight = h < 6 || h > 20;
+  const isSunset = (h > 17 && h < 20) || (h > 5 && h < 7);
+  if (isNight) {
+    scene.background.set(0x080810);
+    sun.intensity = 0.05;
+    ambientLight.intensity = 0.1;
+    ambientLight.color.set(0x3040a0);
+  } else if (isSunset) {
+    scene.background.set(0xe0784a);
+    sun.color.set(0xff8040);
+    sun.intensity = 0.8;
+    ambientLight.color.set(0xff9060);
+  } else {
+    scene.background.set(0x87a8c5);
+    sun.color.set(0xfff5d0);
+    sun.intensity = parseFloat(document.getElementById('sun').value) / 75 * 1.2;
+    ambientLight.color.set(0xfff5e0);
+    ambientLight.intensity = parseFloat(document.getElementById('amb').value) / 40 * 0.4;
+  }
+});
+
+document.getElementById('sun').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('sun-val').textContent = v + '%';
+  sun.intensity = v / 75 * 1.2;
+});
+
+document.getElementById('amb').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('amb-val').textContent = v + '%';
+  ambientLight.intensity = v / 40 * 0.4;
+});
+
+document.getElementById('glass-tint').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('tint-val').textContent = v + '%';
+  if (!model) return;
+  const darkness = v / 100;
+  model.traverse(child => {
+    if (child.isMesh) {
+      const orig = originalMaterials.get(child.uuid);
+      if (!orig) return;
+      const r = orig.color.r, g = orig.color.g, b = orig.color.b;
+      const isGlass = b > r && b > g && orig.transparent;
+      if (isGlass) {
+        child.material.color.setRGB(r * (1-darkness*0.7), g * (1-darkness*0.5), b);
+      }
+    }
+  });
+});
+
+document.getElementById('glass-opacity').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('opacity-val').textContent = v + '%';
+  if (!model) return;
+  model.traverse(child => {
+    if (child.isMesh && child.material.transparent) {
+      child.material.opacity = v / 100;
+    }
+  });
+});
+
+document.getElementById('pool-hue').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  const labels = [0,'Turquoise',20,'Caribbean',40,'Azure',60,'Pacific',80,'Deep',100,''];
+  let label = 'Caribbean';
+  for (let i = labels.length-2; i >= 0; i -= 2) {
+    if (v >= labels[i]) { label = labels[i+1]; break; }
+  }
+  document.getElementById('pool-val').textContent = label;
+  if (!model) return;
+  const poolColors = [0x40e0c8, 0x10a0c0, 0x1060d0, 0x0840b0, 0x042080];
+  const idx = Math.min(4, Math.floor(v / 20));
+  const col = new THREE.Color(poolColors[idx]);
+  model.traverse(child => {
+    if (child.isMesh) {
+      const orig = originalMaterials.get(child.uuid);
+      if (!orig) return;
+      const r = orig.color.r, g = orig.color.g, b = orig.color.b;
+      const isPool = b > 0.4 && g > 0.3 && r < 0.4;
+      if (isPool) child.material.color.copy(col);
+    }
+  });
+});
+
+document.getElementById('trees').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('trees-val').textContent = v + '%';
+  const threshold = 1 - v/100;
+  trees.forEach((t, i) => {
+    const vis = (i / trees.length) >= threshold;
+    t.trunk.visible = vis;
+    t.crown.visible = vis;
+  });
+});
+
+document.getElementById('grass').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  const labels = ['Dry','Dry','Savanna','Savanna','Tropical','Tropical','Lush','Lush','Dense','Dense','Rainforest'];
+  document.getElementById('grass-val').textContent = labels[Math.floor(v/10)] || 'Tropical';
+  const colors = [0x8a7040, 0x7a8040, 0x4a7030, 0x2d5a1e, 0x1a4a10];
+  const idx = Math.min(4, Math.floor(v/20));
+  const col = new THREE.Color(colors[idx]);
+  if (model) {
+    model.traverse(child => {
+      if (child.isMesh) {
+        const orig = originalMaterials.get(child.uuid);
+        if (!orig) return;
+        const isGreen = orig.color.g > orig.color.r * 1.2 && orig.color.g > orig.color.b;
+        if (isGreen) child.material.color.copy(col);
+      }
+    });
+  }
+  scene.traverse(child => {
+    if (child.isMesh && child.material && !child.castShadow) {
+      child.material.color.copy(col);
+    }
+  });
+});
+
+initScene();
+initOrbitControls();
+loadGLTF();
+</script>
+</body>
+</html>
